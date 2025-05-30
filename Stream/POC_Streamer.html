@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamHub de Jogos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            max-width: 900px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        .stream-container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            padding: 20px;
+            width: 100%;
+            max-width: 900px;
+            box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura */
+        }
+
+        .stream-container h2 {
+            color: #34495e;
+            margin-top: 0;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0;
+            overflow: hidden;
+            background-color: #000; /* Fundo preto enquanto o vídeo carrega */
+        }
+
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        footer {
+            margin-top: 40px;
+            color: #777;
+            text-align: center;
+            width: 100%;
+            max-width: 900px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>POC - Vizualização de streamers</h1>
+        <p>Streamers Online Abaixo</p>
+    </header>
+
+    <div class="stream-container">
+        <h2>🔴 Live na Twitch</h2>
+        <p>Acompanhe o streamer de exemplo da Twitch!</p>
+        <div class="video-wrapper">
+            <iframe
+                src="https://player.twitch.tv/?channel=alanzoka&parent=127.0.0.1&autoplay=true&muted=true"
+                allowfullscreen="true">
+            </iframe>
+        </div>
+        <p><em>Para testes, você pode usar 'gaules' ou 'alanzoka'. Lembre-se de mudar 'SEUDOMINIO.COM' para o domínio real onde seu site estará hospedado (ex: 'meusitejogos.com'). Se você estiver testando localmente, pode usar 'localhost'.</em></p>
+    </div>
+
+    <div class="stream-container">
+        <h2>🔴 Live no YouTube Gaming</h2>
+        <p>Veja o que está rolando no YouTube!</p>
+        <div class="video-wrapper">
+            <iframe
+            src="https://www.youtube.com/embed/xRPjKQtRXR8?autoplay=1&mute=1"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+            </iframe>
+        </div>
+        <p><em>Procure por uma transmissão ao vivo de jogos no YouTube e pegue o 'VIDEO_ID' do URL para testar.</em></p>
+    </div>
+
+    <div class="stream-container">
+        <h2>🔴 Live no Kick</h2>
+        <p>Confira o conteúdo do Kick!</p>
+        <div class="video-wrapper">
+            <iframe
+                src="https://player.kick.com/adinross"
+                allowfullscreen="true">
+            </iframe>
+        </div>
+        <p><em>Você pode usar 'adinross' ou procurar por outros streamers populares no Kick para testar.</em></p>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 StreamHub de Jogos. Todos os direitos reservados.</p>
+    </footer>
+</body>
+</html>
