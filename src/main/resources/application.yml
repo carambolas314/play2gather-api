@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: demo
+  main:
+    web-application-type: reactive
+  cloud:
+    gateway:
+      routes:
+        - id: sirizao
+          uri: http://localhost:8081
+          predicates:
+            - Path=/products
+          filters:
+            - SetPath=/api/products
+server:
+  port: 8080
