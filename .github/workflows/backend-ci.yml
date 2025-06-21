@@ -1,0 +1,182 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - development
+    paths:
+      - '**.java'
+      - '**.xml'
+  pull_request:
+    branches:
+      - main
+      - development
+    paths:
+      - '**.java'
+      - '**.xml'
+
+jobs:
+  detect-services:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    name: Detect Services
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Descobrir serviços (pastas com pom.xml)
+        id: set-matrix
+        run: |
+          SERVICES=$(find . -name "pom.xml" | grep -v "gateway" | sed 's|./||' | sed 's|/pom.xml||')
+          echo "Encontrado: $SERVICES"
+          JSON=$(echo "$SERVICES" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({service: .})')
+          echo "matrix=$JSON" >> $GITHUB_OUTPUT
+
+  gateway:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    name: Build & Test - Gateway
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build with Maven
+        run: mvn clean verify
+
+  build-services:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
+    name: Build & Test - Services
+    needs: detect-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{fromJson(needs.detect-services.outputs.matrix)}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build Maven
+        run: mvn clean verify
+        working-directory: ${{ matrix.service }}
+
+  push-images:
+    if: github.ref == 'refs/heads/main'
+    name: Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [gateway, build-services]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login no DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build e Push Gateway
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            -t ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-latest \
+            -t ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-$GITHUB_SHA \
+            -f gateway/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-latest
+          docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-$GITHUB_SHA
+
+      - name: Build e Push de Serviços
+        run: |
+          for d in */ ; do
+            if [ -f "$d/Dockerfile" ] && [ "$d" != "gateway/" ]; then
+              SERVICE=$(basename "$d")
+              docker build \
+                --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+                -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-latest \
+                -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-$GITHUB_SHA \
+                -f "$d/Dockerfile" .
+              docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-latest
+              docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-$GITHUB_SHA
+            fi
+          done
+
+      - name: Criar estrutura do dev-env
+        run: |
+          mkdir -p dev-env
+          cp infra/dev-env/.env.example dev-env/.env.example
+          cp infra/dev-env/docker-compose.yml dev-env/docker-compose.yml
+          cp infra/dev-env/setup.sh dev-env/setup.sh
+          cp infra/dev-env/README.md dev-env/README.md
+          chmod +x dev-env/setup.sh
+
+      - name: Compactar em dev-env.zip
+        run: zip -r dev-env.zip dev-env/
+
+      - name: Armazenar como artefato
+        uses: actions/upload-artifact@v3
+        with:
+          name: dev-env
+          path: dev-env.zip
+
+  upload-dev-env-with-rclone:
+    if: github.ref == 'refs/heads/main'
+    name: Upload dev-env.zip (Versionado por Commit)
+    needs: push-images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Baixar artefato
+        uses: actions/download-artifact@v3
+        with:
+          name: dev-env
+          path: ./artifacts
+
+      - name: Instalar RClone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone version
+
+      - name: Configurar RClone
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG_DRIVE }}" > ~/.config/rclone/rclone.conf
+
+      - name: Upload Versionado
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          rclone copy ./artifacts/dev-env.zip \
+            "${{ secrets.RCLONE_REMOTE_NAME }}:" \
+            --drive-root-folder-id "${{ secrets.GDRIVE_FOLDER_ID }}" \
+            --drive-upload-cutoff 64M \
+            --drive-chunk-size 64M \
+            --progress \
+            --stats-one-line \
+            --log-level INFO
+          echo "✅ Enviado: dev-env-${COMMIT_HASH}.zip"
+
+      - name: Verificar Upload
+        run: |
+          rclone lsf "${{ secrets.RCLONE_REMOTE_NAME }}:" \
+            --drive-root-folder-id "${{ secrets.GDRIVE_FOLDER_ID }}" \
+            --include "dev-env-*"
