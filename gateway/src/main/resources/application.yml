@@ -14,3 +14,15 @@ spring:
             - SetPath=/users
 server:
   port: 8080
+logging:
+  level:
+      root: INFO
+      com.play2gather: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %5p [traceId=%X{traceId}] [%t] %c{1} - %m%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} %5p [traceId=%X{traceId}] [%t] %c{1} - %m%n"
+  file:
+      name: logs/gateway.log
+  charset:
+      console: UTF-8
+      file: UTF-8

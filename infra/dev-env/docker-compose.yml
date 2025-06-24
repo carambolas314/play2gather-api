@@ -1,9 +1,30 @@
-version: '3.8'
+version: '3.9'
 services:
   gateway:
-    image: ${DOCKER_REPOSITORY:-carambolas314/play2gather-api}:gateway-latest
+    image: carambolas314/play2gather-api:gateway-latest
+    environment: []
     ports:
-      - '8080:8080'
+    - 8080:8080
+  logger:
+    image: carambolas314/play2gather-api:logger-latest
     environment:
-      - PORT=8080
-
+    - MONGO_URI=${LOGGER_MONGO_URI}
+    - DB_HOST=${LOGGER_DB_HOST}
+    - DB_NAME=${LOGGER_DB_NAME}
+    - DB_PORT=${LOGGER_DB_PORT}
+    - DB_USER=${LOGGER_DB_USER}
+    - DB_PASSWORD=${LOGGER_DB_PASSWORD}
+  logger-mongodb:
+    image: mongo:7.0
+    container_name: logger-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${LOGGER_DB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${LOGGER_DB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${LOGGER_DB_NAME}
+    ports:
+    - ${LOGGER_DB_PORT}:27017
+    volumes:
+    - logger-mongo-data:/data/db
+    restart: unless-stopped
+volumes:
+  logger-mongo-data: {}

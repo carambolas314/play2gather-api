@@ -17,31 +17,9 @@ on:
       - '**.xml'
 
 jobs:
-  detect-services:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
-    name: Detect Services
+  build-backend:
+    name: Build All Modules
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Descobrir serviços (pastas com pom.xml)
-        id: set-matrix
-        run: |
-          SERVICES=$(find . -name "pom.xml" | grep -v "gateway" | sed 's|./||' | sed 's|/pom.xml||')
-          echo "Encontrado: $SERVICES"
-          JSON=$(echo "$SERVICES" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({service: .})')
-          echo "matrix=$JSON" >> $GITHUB_OUTPUT
-
-  gateway:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
-    name: Build & Test - Gateway
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./gateway
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -52,36 +30,14 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Build with Maven
-        run: mvn clean verify
-
-  build-services:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
-    name: Build & Test - Services
-    needs: detect-services
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include: ${{fromJson(needs.detect-services.outputs.matrix)}}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Build Maven
-        run: mvn clean verify
-        working-directory: ${{ matrix.service }}
+      - name: Build all with Maven
+        run: mvn clean install --no-transfer-progress
 
   push-images:
     if: github.ref == 'refs/heads/main'
-    name: Push Docker Images
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: [gateway, build-services]
+    needs: build-backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,28 +48,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build e Push Gateway
-        run: |
-          docker build \
-            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            -t ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-latest \
-            -t ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-$GITHUB_SHA \
-            -f gateway/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-latest
-          docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:gateway-$GITHUB_SHA
-
-      - name: Build e Push de Serviços
+      - name: Build e Push de Imagens
         run: |
           for d in */ ; do
-            if [ -f "$d/Dockerfile" ] && [ "$d" != "gateway/" ]; then
+            if [ -f "$d/Dockerfile" ]; then
               SERVICE=$(basename "$d")
               docker build \
-                --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+                --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
                 -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-latest \
-                -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-$GITHUB_SHA \
-                -f "$d/Dockerfile" .
+                -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-${GITHUB_SHA} \
+                -f "$d/Dockerfile" "$d"
               docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-latest
-              docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-$GITHUB_SHA
+              docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-${GITHUB_SHA}
             fi
           done
 

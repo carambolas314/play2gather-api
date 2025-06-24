@@ -1,4 +1,4 @@
 #!/bin/bash
 
 echo "🚀 Subindo containers com docker-compose..."
-docker-compose up
+docker-compose --env-file .env up

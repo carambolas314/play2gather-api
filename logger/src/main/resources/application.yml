@@ -1,0 +1,10 @@
+app:
+  use-dotenv: ${DOCKER:true}
+spring:
+  data:
+    mongodb:
+      uri: ${MONGO_URI}
+  application:
+    name: logger
+server:
+  port: 8082

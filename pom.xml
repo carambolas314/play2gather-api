@@ -1,0 +1,26 @@
+<!-- /play2gather-api/pom.xml -->
+<project>
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.play2gather</groupId>
+  <artifactId>play2gather-api</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>common-contracts</module>
+    <module>logger</module>
+    <module>gateway</module>
+  </modules>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>3.2.5</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>
