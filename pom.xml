@@ -11,6 +11,7 @@
     <module>common-contracts</module>
     <module>logger</module>
     <module>gateway</module>
+    <module>iam</module>
   </modules>
   <dependencyManagement>
     <dependencies>

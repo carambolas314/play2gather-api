@@ -99,6 +99,11 @@ for service_dir in os.listdir(ROOT_DIR):
                             services_info[service_dir]["dependencies"].append("mongodb")
                         elif dep == "postgresql":
                             pg_service = f"{service_dir}-postgres"
+                            url_key = f"{service_dir.upper()}_DB_URL"
+                            if url_key in central_env:
+                                uri = central_env[url_key]
+                                if "localhost" in uri:
+                                    central_env[url_key] = uri.replace("localhost", pg_service)
                             compose_data["services"][pg_service] = {
                                 "image": "postgres:16",
                                 "container_name": pg_service,

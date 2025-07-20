@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: iam
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+server:
+  port: 8083
+jwt:
+  access-key: ${JWT_ACCESS_SECRET}
+  refresh-key: ${JWT_REFRESH_SECRET}
+  access-token-expiration: 900000     # 15 min
+  refresh-token-expiration: 604800000   # 7 days

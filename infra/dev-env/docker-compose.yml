@@ -5,6 +5,28 @@ services:
     environment: []
     ports:
     - 8080:8080
+  iam:
+    image: carambolas314/play2gather-api:iam-latest
+    environment:
+    - JWT_ACCESS_SECRET=${IAM_JWT_ACCESS_SECRET}
+    - JWT_REFRESH_SECRET=${IAM_JWT_REFRESH_SECRET}
+    - DB_URL=${IAM_DB_URL}
+    - DB_NAME=${IAM_DB_NAME}
+    - DB_PORT=${IAM_DB_PORT}
+    - DB_USER=${IAM_DB_USER}
+    - DB_PASSWORD=${IAM_DB_PASSWORD}
+  iam-postgres:
+    image: postgres:16
+    container_name: iam-postgres
+    environment:
+      POSTGRES_USER: ${IAM_DB_USER}
+      POSTGRES_PASSWORD: ${IAM_DB_PASSWORD}
+      POSTGRES_DB: ${IAM_DB_NAME}
+    ports:
+    - ${IAM_DB_PORT}:5432
+    volumes:
+    - iam-pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
   logger:
     image: carambolas314/play2gather-api:logger-latest
     environment:
@@ -27,4 +49,5 @@ services:
     - logger-mongo-data:/data/db
     restart: unless-stopped
 volumes:
+  iam-pg-data: {}
   logger-mongo-data: {}

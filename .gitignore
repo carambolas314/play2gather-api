@@ -1,1 +1,3 @@
 .env.centralized
+./docker-compose.yml
+demo/
