@@ -2,19 +2,27 @@ version: '3.9'
 services:
   gateway:
     image: carambolas314/play2gather-api:gateway-latest
-    environment: []
+    environment:
+    - JWT_PUBLIC_KEY=${GATEWAY_JWT_PUBLIC_KEY}
+    - IAM_SERVICE_URL=${GATEWAY_IAM_SERVICE_URL}
+    - DOCKER_IAM_SERVICE_URL=${GATEWAY_DOCKER_IAM_SERVICE_URL}
+    - FRONTEND_URL=${GATEWAY_FRONTEND_URL}
+    networks:
+    - play2gather-net
     ports:
     - 8080:8080
   iam:
     image: carambolas314/play2gather-api:iam-latest
     environment:
-    - JWT_ACCESS_SECRET=${IAM_JWT_ACCESS_SECRET}
     - JWT_REFRESH_SECRET=${IAM_JWT_REFRESH_SECRET}
+    - JWT_ACCESS_SECRET=${IAM_JWT_ACCESS_SECRET}
     - DB_URL=${IAM_DB_URL}
     - DB_NAME=${IAM_DB_NAME}
     - DB_PORT=${IAM_DB_PORT}
     - DB_USER=${IAM_DB_USER}
     - DB_PASSWORD=${IAM_DB_PASSWORD}
+    networks:
+    - play2gather-net
   iam-postgres:
     image: postgres:16
     container_name: iam-postgres
@@ -27,6 +35,8 @@ services:
     volumes:
     - iam-pg-data:/var/lib/postgresql/data
     restart: unless-stopped
+    networks:
+    - play2gather-net
   logger:
     image: carambolas314/play2gather-api:logger-latest
     environment:
@@ -36,6 +46,8 @@ services:
     - DB_PORT=${LOGGER_DB_PORT}
     - DB_USER=${LOGGER_DB_USER}
     - DB_PASSWORD=${LOGGER_DB_PASSWORD}
+    networks:
+    - play2gather-net
   logger-mongodb:
     image: mongo:7.0
     container_name: logger-mongodb
@@ -48,6 +60,12 @@ services:
     volumes:
     - logger-mongo-data:/data/db
     restart: unless-stopped
+    networks:
+    - play2gather-net
 volumes:
   iam-pg-data: {}
   logger-mongo-data: {}
+networks:
+  play2gather-net:
+    name: play2gather-net
+    driver: bridge

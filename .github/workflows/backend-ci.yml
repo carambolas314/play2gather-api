@@ -33,6 +33,12 @@ jobs:
       - name: Build all with Maven
         run: mvn clean install --no-transfer-progress
 
+      - name: Upload JARs artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jars
+          path: "**/target/*.jar"
+
   push-images:
     if: github.ref == 'refs/heads/main'
     name: Build & Push Docker Images
@@ -41,6 +47,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Baixar JARs do build-backend
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jars
 
       - name: Login no DockerHub
         uses: docker/login-action@v3
@@ -56,27 +67,25 @@ jobs:
               docker build \
                 --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
                 -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-latest \
-                -t ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-${GITHUB_SHA} \
                 -f "$d/Dockerfile" "$d"
               docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-latest
-              docker push ${{ secrets.DOCKERHUB_REPOSITORY }}:$SERVICE-${GITHUB_SHA}
             fi
           done
 
       - name: Criar estrutura do dev-env
         run: |
           mkdir -p dev-env
-          cp infra/dev-env/.env.example dev-env/.env.example
+          cp infra/dev-env/.env.example dev-env/.env.example || true
           cp infra/dev-env/docker-compose.yml dev-env/docker-compose.yml
-          cp infra/dev-env/setup.sh dev-env/setup.sh
-          cp infra/dev-env/README.md dev-env/README.md
+          cp infra/dev-env/setup.sh dev-env/setup.sh || true
+          cp infra/dev-env/README.md dev-env/README.md || true
           chmod +x dev-env/setup.sh
 
       - name: Compactar em dev-env.zip
         run: zip -r dev-env.zip dev-env/
 
       - name: Armazenar como artefato
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dev-env
           path: dev-env.zip
@@ -93,7 +102,7 @@ jobs:
           fetch-depth: 0
 
       - name: Baixar artefato
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dev-env
           path: ./artifacts
@@ -106,7 +115,9 @@ jobs:
       - name: Configurar RClone
         run: |
           mkdir -p ~/.config/rclone
-          echo "${{ secrets.RCLONE_CONFIG_DRIVE }}" > ~/.config/rclone/rclone.conf
+          cat << EOF > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG_DRIVE }}
+          EOF
 
       - name: Upload Versionado
         run: |

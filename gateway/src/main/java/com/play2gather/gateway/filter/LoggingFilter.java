@@ -36,7 +36,6 @@ public class LoggingFilter implements GlobalFilter {
                     MDC.put("traceId", traceId); // <- Reinsere no contexto da thread atual
 
                     long duration = System.currentTimeMillis() - startTime;
-
                     String logJson = "\n{\n" +
                             "  \"timestamp\": \"" + Instant.now() + "\",\n" +
                             "  \"traceId\": \"" + traceId + "\",\n" +

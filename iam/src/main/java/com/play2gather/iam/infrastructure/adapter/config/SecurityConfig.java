@@ -27,13 +27,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(request -> {
-                    var corsConfiguration = new CorsConfiguration().applyPermitDefaultValues();
-                    corsConfiguration.addAllowedOrigin("*"); // Permite o front-end
-                    corsConfiguration.addAllowedMethod("*"); // Permite todos os métodos (GET, POST, etc.)
-                    corsConfiguration.addAllowedHeader("*"); // Permite todos os cabeçalhos
-                    return corsConfiguration;
-                }))
+                .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/iam/user/register", "/iam/auth/**").permitAll()
                         .requestMatchers("/iam/**").authenticated()

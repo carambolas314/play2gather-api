@@ -14,7 +14,13 @@ print("🔄 Atualizando arquivos do ambiente dev-env...")
 compose_data = {
     "version": "3.9",
     "services": {},
-    "volumes": {}
+    "volumes": {},
+    "networks": {
+        "play2gather-net": {
+            "name": "play2gather-net",
+            "driver": "bridge"
+        }
+    }
 }
 
 central_env = {}
@@ -43,7 +49,8 @@ for service_dir in os.listdir(ROOT_DIR):
 
         service_compose = {
             "image": image_tag,
-            "environment": []
+            "environment": [],
+            "networks": ["play2gather-net"]
         }
 
         if service_dir == "gateway":
@@ -54,7 +61,16 @@ for service_dir in os.listdir(ROOT_DIR):
             for key, val in env_data.items():
                 prefixed_key = f"{service_dir.upper()}_{key}"
                 actual_key = key  # O nome da variável que o container espera
-                service_compose["environment"].append(f"{actual_key}=${'{'+prefixed_key+'}'}")
+
+                # Substitui localhost ou URLs por DNS dockerizados
+                if key.endswith("_URL") or "URL" in key:
+                    if "localhost" in val or "127.0.0.1" in val:
+                        for target_service in os.listdir(ROOT_DIR):
+                            if target_service != service_dir and target_service in val:
+                                val = val.replace("localhost", target_service)
+                                val = val.replace("127.0.0.1", target_service)
+
+                service_compose["environment"].append(f"{actual_key}=${{{prefixed_key}}}")
                 central_env[prefixed_key] = val
                 example_env[prefixed_key] = "<value>"
             services_info[service_dir] = {"env": env_data, "dependencies": []}
@@ -87,13 +103,14 @@ for service_dir in os.listdir(ROOT_DIR):
                                 "image": "mongo:7.0",
                                 "container_name": mongo_service,
                                 "environment": {
-                                    "MONGO_INITDB_ROOT_USERNAME": f"${{{service_dir.upper()}_DB_USER}}",
-                                    "MONGO_INITDB_ROOT_PASSWORD": f"${{{service_dir.upper()}_DB_PASSWORD}}",
-                                    "MONGO_INITDB_DATABASE": f"${{{service_dir.upper()}_DB_NAME}}"
+                                    "MONGO_INITDB_ROOT_USERNAME": f"${{{db_user_key}}}",
+                                    "MONGO_INITDB_ROOT_PASSWORD": f"${{{db_pass_key}}}",
+                                    "MONGO_INITDB_DATABASE": f"${{{db_name_key}}}"
                                 },
                                 "ports": [f"${{{service_dir.upper()}_DB_PORT}}:27017"],
                                 "volumes": [f"{service_dir}-mongo-data:/data/db"],
-                                "restart": "unless-stopped"
+                                "restart": "unless-stopped",
+                                "networks": ["play2gather-net"]
                             }
                             compose_data["volumes"][f"{service_dir}-mongo-data"] = {}
                             services_info[service_dir]["dependencies"].append("mongodb")
@@ -114,7 +131,8 @@ for service_dir in os.listdir(ROOT_DIR):
                                 },
                                 "ports": [f"${{{service_dir.upper()}_DB_PORT}}:5432"],
                                 "volumes": [f"{service_dir}-pg-data:/var/lib/postgresql/data"],
-                                "restart": "unless-stopped"
+                                "restart": "unless-stopped",
+                                "networks": ["play2gather-net"]
                             }
                             compose_data["volumes"][f"{service_dir}-pg-data"] = {}
                             services_info[service_dir]["dependencies"].append("postgresql")
@@ -124,7 +142,8 @@ for service_dir in os.listdir(ROOT_DIR):
                                 "image": "redis:7.2",
                                 "container_name": redis_service,
                                 "ports": ["6379:6379"],
-                                "restart": "unless-stopped"
+                                "restart": "unless-stopped",
+                                "networks": ["play2gather-net"]
                             }
                             services_info[service_dir]["dependencies"].append("redis")
                 except Exception as e:
@@ -143,14 +162,18 @@ with open(os.path.join(DEV_ENV_DIR, ".env.example"), "w", encoding="utf-8") as f
 print("📦 Gerando .env.centralized dinâmico na raiz...")
 with open(os.path.join(ROOT_DIR, ".env.centralized"), "w", encoding="utf-8") as f:
     for k, v in central_env.items():
-        f.write(f"{k}={v}\n")
+        if "KEY" in v:
+            escaped_value = v.replace("\n", "\\n")  # Escapa quebras de linha
+            f.write(f'{k}="{escaped_value}"\n')
+        else:
+            f.write(f"{k}={v}\n")
 
 print("🛠️  Gerando setup.sh...")
 with open(os.path.join(DEV_ENV_DIR, "setup.sh"), "w", encoding="utf-8") as f:
     f.write("""#!/bin/bash
 
 echo "🚀 Subindo containers com docker-compose..."
-docker-compose --env-file .env up
+docker-compose --env-file .env up 
 """)
 os.chmod(os.path.join(DEV_ENV_DIR, "setup.sh"), 0o755)
 

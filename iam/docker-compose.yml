@@ -12,6 +12,8 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - play2gather-net
 
   iam:
     build:
@@ -31,5 +33,11 @@ services:
       DB_URL: jdbc:postgresql://iam-db:5432/${DB_NAME}
     depends_on:
       - iam-db
+    networks:
+      - play2gather-net
 volumes:
   postgres_data:
+
+networks:
+  play2gather-net:
+    external: true

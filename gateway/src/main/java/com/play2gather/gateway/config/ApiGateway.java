@@ -10,10 +10,6 @@ public class ApiGateway {
     @Bean
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
         return builder.routes()
-                .route("example",
-                        r -> r.path("/products")
-                                .filters( f -> f.rewritePath( "/products", "/api/products"))
-                        .uri("http://localhost:8081"))
                .route("json_placehoder", r -> r.path("/example")
                        .filters( f -> f.rewritePath( "/example", "/users"))
                        .uri("https://jsonplaceholder.typicode.com"))
