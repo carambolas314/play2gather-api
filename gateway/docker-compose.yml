@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  gateway:
+    container_name: gateway
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: default
+      LOGGING_LEVEL_ROOT: INFO
+      IAM_SERVICE_URL: ${DOCKER_IAM_SERVICE_URL}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - play2gather-net
+    restart: unless-stopped
+
+networks:
+  play2gather-net:
+    name: play2gather-net
+    driver: bridge

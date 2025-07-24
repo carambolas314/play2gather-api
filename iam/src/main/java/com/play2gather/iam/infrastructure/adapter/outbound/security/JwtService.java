@@ -7,7 +7,13 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +28,20 @@ public class JwtService {
         if (isRefresh) {
             return Keys.hmacShaKeyFor(jwtConfig.getRefreshKey().getBytes());
         }
-        return Keys.hmacShaKeyFor(jwtConfig.getAccessKey().getBytes());
+        return getPrivateKey(); // para AccessToken é RSA
+    }
+
+    private PrivateKey getPrivateKey() {
+        try {
+            String key = jwtConfig.getAccessKey()
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .replaceAll("\\s", "");
+            byte[] decoded = Base64.getDecoder().decode(key);
+            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(decoded));
+        } catch (Exception e) {
+            throw new RuntimeException("Could not load private key from env", e);
+        }
     }
 
     public String generateAccessToken(String email, List<String> roles, Long id, UUID jti) {
@@ -33,7 +52,7 @@ public class JwtService {
                 .setId(jti.toString())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtConfig.getAccessTokenExpiration()))
-                .signWith(getSigningKey(false))
+                .signWith(getSigningKey(false)) // Assina com RSA private key
                 .compact();
     }
 
@@ -44,7 +63,7 @@ public class JwtService {
                 .setId(jti.toString())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtConfig.getRefreshTokenExpiration()))
-                .signWith(getSigningKey(true))
+                .signWith(getSigningKey(true)) // Assina com HMAC shared secret
                 .compact();
     }
 

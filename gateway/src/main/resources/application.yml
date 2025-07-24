@@ -1,3 +1,5 @@
+app:
+  use-dotenv: true
 spring:
   application:
     name: gateway
@@ -6,12 +8,30 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: exampleRoute
-          uri: https://jsonplaceholder.typicode.com
+        # Rota 1: Para os endpoints de autenticação específicos
+        - id: iam-service-auth
+          uri: ${IAM_SERVICE_URL}
           predicates:
-            - Path=/exampleyml
+            - Path=/login, /refresh, /logout
           filters:
-            - SetPath=/users
+            - RewritePath=/(?<segment>.*), /iam/auth/${segment}
+
+        # Rota 2: Para todas as outras rotas que já começam com /iam/
+        - id: iam-service-user
+          uri: ${IAM_SERVICE_URL}
+          predicates:
+            - Path=/register, /profile, /update,
+          filters:
+            - RewritePath=/(?<segment>.*), /iam/user/${segment}
+
+        # Rota específica para o DELETE do usuário
+        - id: iam-service-user-delete
+          uri: ${IAM_SERVICE_URL}
+          predicates:
+            - Path=/user
+            - Method=DELETE
+          filters:
+            - SetPath=/iam/user
 server:
   port: 8080
 logging:
@@ -26,3 +46,5 @@ logging:
   charset:
       console: UTF-8
       file: UTF-8
+jwt:
+  public-key: ${JWT_PUBLIC_KEY}
