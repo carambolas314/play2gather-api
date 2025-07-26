@@ -1,70 +1,81 @@
-version: '3.9'
 services:
   gateway:
     image: carambolas314/play2gather-api:gateway-latest
+    container_name: gateway
     environment:
     - JWT_PUBLIC_KEY=${GATEWAY_JWT_PUBLIC_KEY}
-    - IAM_SERVICE_URL=${GATEWAY_IAM_SERVICE_URL}
-    - DOCKER_IAM_SERVICE_URL=${GATEWAY_DOCKER_IAM_SERVICE_URL}
     - FRONTEND_URL=${GATEWAY_FRONTEND_URL}
+    - IAM_SERVICE_URL=${GATEWAY_IAM_SERVICE_URL_DOCKER}
+    - PORT_EXTERNAL=${GATEWAY_PORT_EXTERNAL}
     networks:
     - play2gather-net
     ports:
-    - 8080:8080
+    - ${GATEWAY_PORT_EXTERNAL}:8080
+  iam-postgresql:
+    image: postgres:15
+    container_name: iam-postgresql
+    environment:
+    - POSTGRES_USER=${IAM_DB_USER}
+    - POSTGRES_PASSWORD=${IAM_DB_PASSWORD}
+    - POSTGRES_DB=${IAM_DB_NAME}
+    ports:
+    - ${IAM_DB_PORT_EXTERNAL}:5432
+    volumes:
+    - iam-postgresql-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+    - play2gather-net
   iam:
     image: carambolas314/play2gather-api:iam-latest
+    container_name: iam
     environment:
     - JWT_REFRESH_SECRET=${IAM_JWT_REFRESH_SECRET}
     - JWT_ACCESS_SECRET=${IAM_JWT_ACCESS_SECRET}
-    - DB_URL=${IAM_DB_URL}
+    - DB_URL=${IAM_DB_URL_DOCKER}
     - DB_NAME=${IAM_DB_NAME}
-    - DB_PORT=${IAM_DB_PORT}
     - DB_USER=${IAM_DB_USER}
     - DB_PASSWORD=${IAM_DB_PASSWORD}
+    - DB_PORT_EXTERNAL=${IAM_DB_PORT_EXTERNAL}
+    - PORT_EXTERNAL=${IAM_PORT_EXTERNAL}
     networks:
     - play2gather-net
-  iam-postgres:
-    image: postgres:16
-    container_name: iam-postgres
-    environment:
-      POSTGRES_USER: ${IAM_DB_USER}
-      POSTGRES_PASSWORD: ${IAM_DB_PASSWORD}
-      POSTGRES_DB: ${IAM_DB_NAME}
+    depends_on:
+    - iam-postgresql
     ports:
-    - ${IAM_DB_PORT}:5432
+    - ${IAM_PORT_EXTERNAL}:8083
+  logger-mongodb:
+    image: mongo:7.0
+    container_name: logger-mongodb
+    environment:
+    - MONGO_INITDB_ROOT_USERNAME=${LOGGER_DB_USER}
+    - MONGO_INITDB_ROOT_PASSWORD=${LOGGER_DB_PASSWORD}
+    - MONGO_INITDB_DATABASE=${LOGGER_DB_NAME}
+    ports:
+    - ${LOGGER_DB_PORT_EXTERNAL}:27017
     volumes:
-    - iam-pg-data:/var/lib/postgresql/data
+    - logger-mongodb-data:/data/db
     restart: unless-stopped
     networks:
     - play2gather-net
   logger:
     image: carambolas314/play2gather-api:logger-latest
+    container_name: logger
     environment:
-    - MONGO_URI=${LOGGER_MONGO_URI}
-    - DB_HOST=${LOGGER_DB_HOST}
-    - DB_NAME=${LOGGER_DB_NAME}
-    - DB_PORT=${LOGGER_DB_PORT}
     - DB_USER=${LOGGER_DB_USER}
     - DB_PASSWORD=${LOGGER_DB_PASSWORD}
+    - DB_NAME=${LOGGER_DB_NAME}
+    - MONGO_URI_DOCKER=${LOGGER_MONGO_URI_DOCKER}
+    - DB_PORT_EXTERNAL=${LOGGER_DB_PORT_EXTERNAL}
+    - PORT_EXTERNAL=${LOGGER_PORT_EXTERNAL}
     networks:
     - play2gather-net
-  logger-mongodb:
-    image: mongo:7.0
-    container_name: logger-mongodb
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${LOGGER_DB_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${LOGGER_DB_PASSWORD}
-      MONGO_INITDB_DATABASE: ${LOGGER_DB_NAME}
+    depends_on:
+    - logger-mongodb
     ports:
-    - ${LOGGER_DB_PORT}:27017
-    volumes:
-    - logger-mongo-data:/data/db
-    restart: unless-stopped
-    networks:
-    - play2gather-net
+    - ${LOGGER_PORT_EXTERNAL}:8081
 volumes:
-  iam-pg-data: {}
-  logger-mongo-data: {}
+  iam-postgresql-data: {}
+  logger-mongodb-data: {}
 networks:
   play2gather-net:
     name: play2gather-net

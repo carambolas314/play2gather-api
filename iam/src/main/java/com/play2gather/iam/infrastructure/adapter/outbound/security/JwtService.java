@@ -7,8 +7,6 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
@@ -33,13 +31,16 @@ public class JwtService {
 
     private PrivateKey getPrivateKey() {
         try {
-            String key = jwtConfig.getAccessKey()
+            String rawKey = jwtConfig.getAccessKey();
+            String normalizedKey = rawKey
+                    .replace("\\n", "\n")
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
                     .replaceAll("\\s", "");
-            byte[] decoded = Base64.getDecoder().decode(key);
+            byte[] decoded = Base64.getDecoder().decode(normalizedKey);
             return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(decoded));
         } catch (Exception e) {
+            System.out.println(e);
             throw new RuntimeException("Could not load private key from env", e);
         }
     }

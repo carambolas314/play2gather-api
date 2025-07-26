@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/logs")
 @RequiredArgsConstructor
@@ -22,5 +24,11 @@ public class LogController {
     @GetMapping
     public ResponseEntity<String> verifyLogger() {
         return new ResponseEntity<String>("Logger Rodando", HttpStatus.OK);
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<LogEntry>> showLogs() {
+        List<LogEntry> response =  logService.getAllLogs();
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }

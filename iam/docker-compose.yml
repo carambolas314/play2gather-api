@@ -1,43 +1,31 @@
-version: '3.8'
-
 services:
-  iam-db:
+  iam:
+    build: .
+    ports:
+      - "${PORT_EXTERNAL}:8083"
+    env_file: .env
+    depends_on:
+      - iam-postgresql
+    networks:
+      - play2gather-net
+    restart: unless-stopped
+  iam-postgresql:
     image: postgres:15
+    ports:
+      - "${DB_PORT_EXTERNAL}:5432"
     container_name: iam-postgres
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "${DB_PORT}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - iam-postgres-data:/var/lib/postgresql/data
     networks:
       - play2gather-net
+    restart: unless-stopped
 
-  iam:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: iam-service
-    ports:
-      - "8083:8083"
-    env_file:
-      - .env
-    environment:
-      DOCKER: true
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_URL: jdbc:postgresql://iam-db:5432/${DB_NAME}
-    depends_on:
-      - iam-db
-    networks:
-      - play2gather-net
 volumes:
-  postgres_data:
-
+  iam-postgres-data: {}
 networks:
   play2gather-net:
     external: true
