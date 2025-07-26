@@ -1,4 +1,4 @@
-.env.centralized
+.env
 ./docker-compose.yml
 demo/
 .idea/

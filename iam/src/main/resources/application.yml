@@ -1,10 +1,12 @@
+# /iam/src/main/resources/application.yml
+
+# Configurações padrão, aplicadas a todos os perfis
+server:
+  port: ${PORT_EXTERNAL} # Porta interna padrão do container
+
 spring:
   application:
     name: iam
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -13,10 +15,31 @@ spring:
     properties:
       hibernate:
         format_sql: true
-server:
-  port: 8083
+
 jwt:
   access-key: ${JWT_ACCESS_SECRET}
   refresh-key: ${JWT_REFRESH_SECRET}
   access-token-expiration: 900000     # 15 min
   refresh-token-expiration: 604800000   # 7 days
+
+---
+# Perfil PADRÃO (default): para rodar localmente (mvn spring-boot:run)
+spring:
+  config:
+    activate:
+      on-profile: default
+  datasource:
+    url: ${DB_URL_LOCAL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+---
+# Perfil DOCKER: para rodar dentro de um container
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${DB_URL_DOCKER}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}

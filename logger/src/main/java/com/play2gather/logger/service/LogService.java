@@ -5,6 +5,8 @@ import com.play2gather.logger.repository.LogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class LogService {
@@ -13,5 +15,8 @@ public class LogService {
     public void saveLog(LogEntry request) {
         repository.save(request);
     }
-}
 
+    public List<LogEntry> getAllLogs() {
+        return repository.findAll();
+    }
+}
