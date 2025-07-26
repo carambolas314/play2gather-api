@@ -1,183 +1,204 @@
 import os
-import json
+import re
 import yaml
-from dotenv import dotenv_values
 
-ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+# --- Constantes e Configurações ---
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 DEV_ENV_DIR = os.path.join(ROOT_DIR, "infra", "dev-env")
 DOCKER_REPOSITORY = os.environ.get("DOCKER_REPOSITORY", "carambolas314/play2gather-api")
+VAR_PATTERN = re.compile(r'\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}')
 
-services_info = {}
+def dotenv_values(filepath):
+    """Lê um arquivo .env e retorna um dicionário, tratando comentários."""
+    values = {}
+    if not os.path.isfile(filepath):
+        return values
+    with open(filepath, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, val = line.split('=', 1)
+                values[key.strip()] = val.strip()
+    return values
 
-print("🔄 Atualizando arquivos do ambiente dev-env...")
+def detect_db_dependencies(compose_content):
+    """Detecta dependências de banco de dados a partir do conteúdo do docker-compose."""
+    detected = set()
+    lower_content = compose_content.lower()
+    if "mongo" in lower_content:
+        detected.add("mongodb")
+    if "postgres" in lower_content or "psql" in lower_content:
+        detected.add("postgresql")
+    if "redis" in lower_content:
+        detected.add("redis")
+    return list(detected)
 
-compose_data = {
-    "version": "3.9",
-    "services": {},
-    "volumes": {},
-    "networks": {
-        "play2gather-net": {
-            "name": "play2gather-net",
-            "driver": "bridge"
-        }
-    }
-}
+def scan_services(root_dir):
+    """Escaneia o diretório raiz em busca de microserviços válidos."""
+    service_names = []
+    for item in os.listdir(root_dir):
+        service_path = os.path.join(root_dir, item)
+        dockerfile_path = os.path.join(service_path, "Dockerfile")
+        if os.path.isdir(service_path) and not item.startswith('.') and os.path.isfile(dockerfile_path):
+            service_names.append(item)
+    print(f"✅ Serviços detectados: {', '.join(service_names)}")
+    return service_names
 
-central_env = {}
-example_env = {}
+def process_service(service_name):
+    """Processa um único serviço, coletando suas configurações e dependências."""
+    print(f"⚙️  Processando serviço: {service_name}")
+    service_path = os.path.join(ROOT_DIR, service_name)
 
-def detect_db_dependencies(service_name, compose_content):
-    detected = []
-    lower = compose_content.lower()
-    if "mongo" in lower:
-        detected.append("mongodb")
-    if "postgres" in lower or "psql" in lower:
-        detected.append("postgresql")
-    if "redis" in lower:
-        detected.append("redis")
-    return detected
+    env_data = dotenv_values(os.path.join(service_path, ".env"))
 
-for service_dir in os.listdir(ROOT_DIR):
-    service_path = os.path.join(ROOT_DIR, service_dir)
-    dockerfile_path = os.path.join(service_path, "Dockerfile")
-    env_path = os.path.join(service_path, ".env")
+    dependencies = []
     compose_path = os.path.join(service_path, "docker-compose.yml")
+    if os.path.isfile(compose_path):
+        with open(compose_path, 'r', encoding='utf-8') as f:
+            dependencies = detect_db_dependencies(f.read())
 
-    if os.path.isdir(service_path) and os.path.isfile(dockerfile_path):
-        print(f"🔍 Detectado serviço: {service_dir}")
-        image_tag = f"{DOCKER_REPOSITORY}:{service_dir}-latest"
+    return {
+        "name": service_name,
+        "env": env_data,
+        "dependencies": dependencies
+    }
 
-        service_compose = {
-            "image": image_tag,
+def generate_artifacts(services_data):
+    """Gera o docker-compose.yml global e os arquivos .env."""
+
+    compose_services = {}
+    compose_volumes = {}
+    central_env = {}
+    example_env = {}
+
+    for service in services_data:
+        service_name = service["name"]
+        env_data = service["env"]
+
+        # --- Adiciona o serviço da aplicação ao compose ---
+        app_service = {
+            "image": f"{DOCKER_REPOSITORY}:{service_name}-latest",
+            "container_name": service_name,
             "environment": [],
-            "networks": ["play2gather-net"]
+            "networks": ["play2gather-net"],
+            "depends_on": []
         }
 
-        if service_dir == "gateway":
-            service_compose["ports"] = ["8080:8080"]
+        # --- Configura as variáveis de ambiente para o container ---
+        for key, val in env_data.items():
+            prefixed_key = f"{service_name.upper()}_{key}"
 
-        if os.path.isfile(env_path):
-            env_data = dotenv_values(env_path)
-            for key, val in env_data.items():
-                prefixed_key = f"{service_dir.upper()}_{key}"
-                actual_key = key  # O nome da variável que o container espera
+            def replacer(match):
+                var_name = match.group(1)
+        #       return f"${{{service_name.upper()}_{var_name}}}"
+                return f"{env_data[var_name]}"
 
-                # Substitui localhost ou URLs por DNS dockerizados
-                if key.endswith("_URL") or "URL" in key:
-                    if "localhost" in val or "127.0.0.1" in val:
-                        for target_service in os.listdir(ROOT_DIR):
-                            if target_service != service_dir and target_service in val:
-                                val = val.replace("localhost", target_service)
-                                val = val.replace("127.0.0.1", target_service)
+            rewritten_val = VAR_PATTERN.sub(replacer, val)
 
-                service_compose["environment"].append(f"{actual_key}=${{{prefixed_key}}}")
-                central_env[prefixed_key] = val
-                example_env[prefixed_key] = "<value>"
-            services_info[service_dir] = {"env": env_data, "dependencies": []}
-        else:
-            services_info[service_dir] = {"env": {}, "dependencies": []}
+            central_env[prefixed_key] = rewritten_val
+            example_env[prefixed_key] = "<value>"
 
-        compose_data["services"][service_dir] = service_compose
+            # O container sempre usa a versão DOCKER da URL, se existir
+            if key.endswith("_DOCKER") and not key.startswith("MONGO"):
+                # Passa a variável para o container com o nome genérico (sem _DOCKER)
+                generic_key = key.replace("_DOCKER", "")
+                app_service["environment"].append(f"{generic_key}=${{{prefixed_key}}}")
+            elif not key.endswith("_LOCAL"):
+                app_service["environment"].append(f"{key}=${{{prefixed_key}}}")
 
-        if os.path.isfile(compose_path):
-            with open(compose_path, encoding="utf-8") as f:
-                try:
-                    service_compose_data = f.read()
-                    dependencies = detect_db_dependencies(service_dir, service_compose_data)
-                    for dep in dependencies:
-                        print(f"📦 {service_dir} depende de {dep.upper()}")
-                        if dep == "mongodb":
-                            mongo_service = f"{service_dir}-mongodb"
-                            db_user_key = f"{service_dir.upper()}_DB_USER"
-                            db_pass_key = f"{service_dir.upper()}_DB_PASSWORD"
-                            db_name_key = f"{service_dir.upper()}_DB_NAME"
-                            db_host_key = f"{service_dir.upper()}_DB_HOST"
-                            uri_key = f"{service_dir.upper()}_MONGO_URI"
-                            if uri_key in central_env:
-                                uri = central_env[uri_key]
-                                if "localhost" in uri and db_host_key in central_env:
-                                    central_env[uri_key] = uri.replace("localhost", mongo_service)
-                                    central_env[db_host_key] = mongo_service
+        if service_name == "gateway":
+            app_service["ports"] = [f"${{{service_name.upper()}_PORT_EXTERNAL}}:8080"]
+        if service_name == "iam":
+            app_service["ports"] = [f"${{{service_name.upper()}_PORT_EXTERNAL}}:8083"]
+        if service_name == "logger":
+            app_service["ports"] = [f"${{{service_name.upper()}_PORT_EXTERNAL}}:8081"]
 
-                            compose_data["services"][mongo_service] = {
-                                "image": "mongo:7.0",
-                                "container_name": mongo_service,
-                                "environment": {
-                                    "MONGO_INITDB_ROOT_USERNAME": f"${{{db_user_key}}}",
-                                    "MONGO_INITDB_ROOT_PASSWORD": f"${{{db_pass_key}}}",
-                                    "MONGO_INITDB_DATABASE": f"${{{db_name_key}}}"
-                                },
-                                "ports": [f"${{{service_dir.upper()}_DB_PORT}}:27017"],
-                                "volumes": [f"{service_dir}-mongo-data:/data/db"],
-                                "restart": "unless-stopped",
-                                "networks": ["play2gather-net"]
-                            }
-                            compose_data["volumes"][f"{service_dir}-mongo-data"] = {}
-                            services_info[service_dir]["dependencies"].append("mongodb")
-                        elif dep == "postgresql":
-                            pg_service = f"{service_dir}-postgres"
-                            url_key = f"{service_dir.upper()}_DB_URL"
-                            if url_key in central_env:
-                                uri = central_env[url_key]
-                                if "localhost" in uri:
-                                    central_env[url_key] = uri.replace("localhost", pg_service)
-                            compose_data["services"][pg_service] = {
-                                "image": "postgres:16",
-                                "container_name": pg_service,
-                                "environment": {
-                                    "POSTGRES_USER": f"${{{service_dir.upper()}_DB_USER}}",
-                                    "POSTGRES_PASSWORD": f"${{{service_dir.upper()}_DB_PASSWORD}}",
-                                    "POSTGRES_DB": f"${{{service_dir.upper()}_DB_NAME}}"
-                                },
-                                "ports": [f"${{{service_dir.upper()}_DB_PORT}}:5432"],
-                                "volumes": [f"{service_dir}-pg-data:/var/lib/postgresql/data"],
-                                "restart": "unless-stopped",
-                                "networks": ["play2gather-net"]
-                            }
-                            compose_data["volumes"][f"{service_dir}-pg-data"] = {}
-                            services_info[service_dir]["dependencies"].append("postgresql")
-                        elif dep == "redis":
-                            redis_service = f"{service_dir}-redis"
-                            compose_data["services"][redis_service] = {
-                                "image": "redis:7.2",
-                                "container_name": redis_service,
-                                "ports": ["6379:6379"],
-                                "restart": "unless-stopped",
-                                "networks": ["play2gather-net"]
-                            }
-                            services_info[service_dir]["dependencies"].append("redis")
-                except Exception as e:
-                    print(f"⚠️ Erro ao processar docker-compose de {service_dir}: {e}")
+        # --- Adiciona os serviços de banco de dados ao compose ---
+        for dep_type in service["dependencies"]:
+            db_service_name = f"{service_name}-{dep_type}"
+            app_service["depends_on"].append(db_service_name)
 
-print("📄 Gerando docker-compose.yml...")
-os.makedirs(DEV_ENV_DIR, exist_ok=True)
-with open(os.path.join(DEV_ENV_DIR, "docker-compose.yml"), "w", encoding="utf-8") as f:
-    yaml.dump(compose_data, f, sort_keys=False)
+            db_port_key = f"{service_name.upper()}_DB_PORT_EXTERNAL"
+            db_user_key = f"{service_name.upper()}_DB_USER"
+            db_pass_key = f"{service_name.upper()}_DB_PASSWORD"
+            db_name_key = f"{service_name.upper()}_DB_NAME"
 
-print("📦 Gerando .env.example...")
-with open(os.path.join(DEV_ENV_DIR, ".env.example"), "w", encoding="utf-8") as f:
-    for k, v in example_env.items():
-        f.write(f"{k}={v}\n")
+            if dep_type == "postgresql":
+                compose_services[db_service_name] = {
+                    "image": "postgres:15",
+                    "container_name": db_service_name,
+                    "environment": [
+                        f"POSTGRES_USER=${{{db_user_key}}}",
+                        f"POSTGRES_PASSWORD=${{{db_pass_key}}}",
+                        f"POSTGRES_DB=${{{db_name_key}}}"
+                    ],
+                    "ports": [f"${{{db_port_key}}}:5432"],
+                    "volumes": [f"{db_service_name}-data:/var/lib/postgresql/data"],
+                    "restart": "unless-stopped",
+                    "networks": ["play2gather-net"]
+                }
+                compose_volumes[f"{db_service_name}-data"] = {}
 
-print("📦 Gerando .env.centralized dinâmico na raiz...")
-with open(os.path.join(ROOT_DIR, ".env.centralized"), "w", encoding="utf-8") as f:
-    for k, v in central_env.items():
-        if "KEY" in v:
-            escaped_value = v.replace("\n", "\\n")  # Escapa quebras de linha
-            f.write(f'{k}="{escaped_value}"\n')
-        else:
+            elif dep_type == "mongodb":
+                compose_services[db_service_name] = {
+                    "image": "mongo:7.0",
+                    "container_name": db_service_name,
+                    "environment": [
+                        f"MONGO_INITDB_ROOT_USERNAME=${{{db_user_key}}}",
+                        f"MONGO_INITDB_ROOT_PASSWORD=${{{db_pass_key}}}",
+                        f"MONGO_INITDB_DATABASE=${{{db_name_key}}}"
+                    ],
+                    "ports": [f"${{{db_port_key}}}:27017"],
+                    "volumes": [f"{db_service_name}-data:/data/db"],
+                    "restart": "unless-stopped",
+                    "networks": ["play2gather-net"]
+                }
+                compose_volumes[f"{db_service_name}-data"] = {}
+
+        if not app_service["depends_on"]:
+            del app_service["depends_on"]
+
+        compose_services[service_name] = app_service
+
+    # --- Monta o dicionário final do Compose ---
+    final_compose_data = {
+        "services": compose_services,
+        "volumes": compose_volumes,
+        "networks": {"play2gather-net": {"name": "play2gather-net", "driver": "bridge"}}
+    }
+
+    # --- Escreve os arquivos ---
+    os.makedirs(DEV_ENV_DIR, exist_ok=True)
+
+    print("\n📄 Gerando infra/dev-env/docker-compose.yml...")
+    with open(os.path.join(DEV_ENV_DIR, "docker-compose.yml"), "w", encoding="utf-8") as f:
+        yaml.dump(final_compose_data, f, sort_keys=False, default_flow_style=False, indent=2)
+
+    print("📦 Gerando .env global na raiz...")
+    with open(os.path.join(ROOT_DIR, ".env"), "w", encoding="utf-8") as f:
+        for k, v in sorted(central_env.items()):
+            f.write(f'{k}={v}\n')
+
+    print("📦 Gerando infra/dev-env/.env.example...")
+    with open(os.path.join(DEV_ENV_DIR, ".env.example"), "w", encoding="utf-8") as f:
+        for k, v in sorted(example_env.items()):
             f.write(f"{k}={v}\n")
 
-print("🛠️  Gerando setup.sh...")
-with open(os.path.join(DEV_ENV_DIR, "setup.sh"), "w", encoding="utf-8") as f:
-    f.write("""#!/bin/bash
+    print("🛠️  Gerando infra/dev-env/setup.sh...")
+    with open(os.path.join(DEV_ENV_DIR, "setup.sh"), "w", encoding="utf-8") as f:
+        f.write("#!/bin/bash\n\n")
+        f.write('echo "🚀 Subindo containers com docker-compose..."\n')
+        f.write("# Este script espera que um arquivo .env global seja criado a partir do .env na raiz.\n")
+        f.write("docker-compose --env-file .env up\n")
+    os.chmod(os.path.join(DEV_ENV_DIR, "setup.sh"), 0o755)
 
-echo "🚀 Subindo containers com docker-compose..."
-docker-compose --env-file .env up 
-""")
-os.chmod(os.path.join(DEV_ENV_DIR, "setup.sh"), 0o755)
+def main():
+    """Função principal para orquestrar a geração do ambiente de desenvolvimento."""
+    print("--- Iniciando Geração de Ambiente de Desenvolvimento ---")
+    service_names = scan_services(ROOT_DIR)
+    services_data = [process_service(name) for name in service_names]
+    generate_artifacts(services_data)
+    print("\n--- ✅ Processo Concluído com Sucesso! ---")
 
-print("✅ Ambiente dev-env atualizado com sucesso!")
-print("📋 Serviços adicionados:")
-for s in services_info:
-    print(f" - {s}")
+if __name__ == "__main__":
+    main()

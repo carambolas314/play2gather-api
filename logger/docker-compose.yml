@@ -1,36 +1,32 @@
-version: '3.8'
-
 services:
-  mongodb:
+  logger:
+    build: .
+    ports:
+      - "${PORT_EXTERNAL}:8081"
+    env_file: .env
+    depends_on:
+      - logger-mongodb
+    networks:
+      - play2gather-net
+    restart: unless-stopped
+  logger-mongodb:
     image: mongo:7.0
-    container_name: logger-mongodb
+    ports:
+      - "${DB_PORT_EXTERNAL}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${DB_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${DB_PASSWORD}
       MONGO_INITDB_DATABASE: ${DB_NAME}
-    ports:
-      - "${DB_PORT}:27017"
     volumes:
-      - logger-mongo-data:/data/db
+      - logger-mongodb-data:/data/db
     restart: unless-stopped
-  logger:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: logger-service
-    ports:
-      - "8082:8082"
-    env_file:
-      - .env
-    depends_on:
-      - mongodb
-    environment:
-      MONGO_URI: mongodb://${DB_USER}:${DB_PASSWORD}@mongodb:27017/${DB_NAME}?authSource=${DB_USER}
-      DB_HOST: mongodb
-      DB_PORT: 27017
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-    restart: unless-stopped
+    networks:
+      - play2gather-net
+
 volumes:
-  logger-mongo-data:
+  logger-mongodb-data: {}
+
+networks:
+  play2gather-net:
+    name: play2gather-net
+    external: true
