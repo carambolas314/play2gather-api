@@ -41,7 +41,7 @@ public class LoggingFilter implements GlobalFilter {
                             "  \"traceId\": \"" + traceId + "\",\n" +
                             "  \"requestId\": \"" + requestId + "\",\n" +
                             "  \"method\": \"" + exchange.getRequest().getMethod() + "\",\n" +
-                            "  \"path\": \"" + exchange.getRequest().getURI().getPath() + "\",\n" +
+                            "  \"path\": \"" + exchange.getRequest().getURI() + "\",\n" +
                             "  \"status\": " + (exchange.getResponse().getStatusCode() != null ? exchange.getResponse().getStatusCode().value() : "null") + ",\n" +
                             "  \"durationMs\": " + duration + "\n" +
                             "}";

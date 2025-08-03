@@ -1,4 +1,4 @@
-.env
+infra/dev-env/.env
 ./docker-compose.yml
 demo/
 .idea/

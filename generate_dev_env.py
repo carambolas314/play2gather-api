@@ -101,7 +101,7 @@ def generate_artifacts(services_data):
             # O container sempre usa a versão DOCKER da URL, se existir
             if key.endswith("_DOCKER") and not key.startswith("MONGO"):
                 # Passa a variável para o container com o nome genérico (sem _DOCKER)
-                generic_key = key.replace("_DOCKER", "")
+                generic_key = key.replace("_DOCKER", "_DOCKER")
                 app_service["environment"].append(f"{generic_key}=${{{prefixed_key}}}")
             elif not key.endswith("_LOCAL"):
                 app_service["environment"].append(f"{key}=${{{prefixed_key}}}")
@@ -175,7 +175,7 @@ def generate_artifacts(services_data):
         yaml.dump(final_compose_data, f, sort_keys=False, default_flow_style=False, indent=2)
 
     print("📦 Gerando .env global na raiz...")
-    with open(os.path.join(ROOT_DIR, ".env"), "w", encoding="utf-8") as f:
+    with open(os.path.join(DEV_ENV_DIR, ".env"), "w", encoding="utf-8") as f:
         for k, v in sorted(central_env.items()):
             f.write(f'{k}={v}\n')
 

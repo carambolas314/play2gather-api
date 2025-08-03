@@ -32,6 +32,10 @@ spring:
     url: ${DB_URL_LOCAL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+app:
+  cookie:
+    secure: ${COOKIE_SECURE_LOCAL}
+    same-site: ${COOKIE_SAME_SITE_LOCAL}
 
 ---
 # Perfil DOCKER: para rodar dentro de um container
@@ -43,3 +47,7 @@ spring:
     url: ${DB_URL_DOCKER}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+app:
+  cookie:
+    secure: ${COOKIE_SECURE_DOCKER}
+    same-site: ${COOKIE_SAME_SITE_DOCKER}

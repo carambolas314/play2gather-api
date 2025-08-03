@@ -18,20 +18,16 @@ spring:
         - id: iam-service-auth
           uri: ${app.iam-service-url}
           predicates:
-            - Path=/login
-            - Path=/refresh
-            - Path=/logout
+            - Path=/login,/refresh,/logout
           filters:
-            - RewritePath=/(?<segment>.*),/iam/auth/${segment}
+            - RewritePath=/(?<segment>.*), /iam/auth/${segment}
 
         - id: iam-service-user
           uri: ${app.iam-service-url}
           predicates:
-            - Path=/register
-            - Path=/profile
-            - Path=/update
+            - Path=/register,/profile,/update
           filters:
-            - RewritePath=/(?<segment>.*),/iam/user/${segment}
+            - RewritePath=/(?<segment>.*), /iam/user/${segment}
 
         - id: iam-service-user-delete
           uri: ${app.iam-service-url}

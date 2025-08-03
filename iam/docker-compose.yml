@@ -13,7 +13,7 @@ services:
     image: postgres:15
     ports:
       - "${DB_PORT_EXTERNAL}:5432"
-    container_name: iam-postgres
+    container_name: iam-postgresql
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

@@ -6,6 +6,7 @@ import com.play2gather.iam.common.dto.response.TokenResponse;
 import com.play2gather.iam.domain.port.in.LoginUseCase;
 import com.play2gather.iam.domain.port.in.LogoutUseCase;
 import com.play2gather.iam.domain.port.in.RefreshTokenUseCase;
+import com.play2gather.iam.infrastructure.adapter.config.CookieProperties;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,8 @@ public class AuthController {
     private LoginUseCase loginUseCase;
     @Autowired
     private LogoutUseCase logoutUseCase;
+    @Autowired
+    private CookieProperties cookieProperties;
 
     //private final OAuth2LoginUseCase oAuth2LoginUseCase;
 
@@ -40,10 +43,10 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("refreshToken", tokenResponse.getRefreshToken())
                 .httpOnly(true)
-                .secure(false) // mudar para true depois
+                .secure(cookieProperties.isSecure()) // mudar para true depois
                 .path("/")
                 .maxAge(Duration.ofDays(7))
-                .sameSite("Strict")
+                .sameSite(cookieProperties.getSameSite())
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());

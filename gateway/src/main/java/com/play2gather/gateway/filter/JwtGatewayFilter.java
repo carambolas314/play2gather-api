@@ -36,13 +36,14 @@ public class JwtGatewayFilter implements GlobalFilter {
 
         // Se for um endpoint público, segue direto
         if (isPublicEndpoint(path)) {
+            System.out.println("PUBLIC ROUTE");
             return chain.filter(exchange);
         }
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
         // Se não houver token, segue mesmo assim — downstream decide se é necessário
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ") || authHeader.startsWith("Bearer null")) {
             System.out.println("ENTROU AQUI");
             return chain.filter(exchange);
         }
